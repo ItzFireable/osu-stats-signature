@@ -15,9 +15,9 @@ const clamp = (num, min, max) => Math.min(Math.max(num, min), max);
 
 export const getSVGTemplete = (type, language) => {
 	try {
-		return fs.readFileSync(path.join(process.cwd(), `/assets/svg_template/${type}/template_${language}.svg`), 'utf8');
+		return fs.readFileSync(path.join(process.cwd(), `/assets/svg_template/mini/template_${language}.svg`), 'utf8');
 	} catch (e) {
-		return fs.readFileSync(path.join(process.cwd(), `/assets/svg_template/${type}/template_cn.svg`), 'utf8');
+		return fs.readFileSync(path.join(process.cwd(), `/assets/svg_template/mini/template_cn.svg`), 'utf8');
 	}
 };
 export const getSVGContent = (x) => {
@@ -154,9 +154,100 @@ const minifySVG = (svg) => {
 		.replace(/\s+/g, ' ')}`;
 };
 
+const ONE_HUNDRED_BILLION = BigInt(100_000_000_000)
+const MAX_ALLOWED_SCORE = BigInt('10000000000000000')
+
+const requiredScoreCache = {}
+
+export function getRequiredScoreForLevel(level) {
+  if (requiredScoreCache[level]) {
+    return requiredScoreCache[level]
+  }
+
+  let score
+  if (level <= 100) {
+    if (level > 1) {
+      score = BigInt(
+        Math.floor(
+          (5000 / 3) * (4 * level ** 3 - 3 * level ** 2 - level)
+            + Math.floor(1.25 * 1.8 ** (level - 60)),
+        ),
+      )
+    }
+    else {
+      score = BigInt(1)
+    }
+  }
+  else {
+    score
+      = BigInt('26931190829')
+      + ONE_HUNDRED_BILLION * BigInt(level)
+      - BigInt(100)
+  }
+
+  requiredScoreCache[level] = score
+  return score
+}
+
+export function getLevel(score) {
+  let left = 1
+  let right = 1_000_000
+
+  while (left < right) {
+    const mid = Math.ceil((left + right) / 2)
+    const requiredScore = getRequiredScoreForLevel(mid)
+
+    if (score >= requiredScore) {
+      left = mid
+    }
+    else {
+      right = mid - 1
+    }
+  }
+
+  return left - 1
+}
+
+export function countMedals (medalsData) {
+	let count = 0;
+
+	for (const medalCategory of Object.values(medalsData)) {
+		for (const medal of Object.values(medalCategory.medals)) {
+			count += medal.count;
+		}
+	}
+
+	return count;
+}
+
+export function getHighestPP (scoreData) {
+	let highestPP = 0;
+
+	for (const score of scoreData.scores) {
+		if (score.performance_points > highestPP) {
+			highestPP = score.performance_points;
+		}
+	}
+
+	return highestPP;
+}
+
+export function getTotalFirstPlaces (topRanksData) {
+	let total = 0;
+
+	for (const rank of topRanksData.scores) {
+		total += 1;
+	}
+	return total;
+}
+
 export const getRenderedSVGFull = (data, avatarBase64, userCoverImageBase64) => {
 	let templete = getSVGTemplete('full', data.options.language);
 	let user = data.user;
+	let stats = data.stats;
+
+	let level = getLevel(stats.ranked_score);
+	let currentLevelProgress = (level - Math.floor(level)) * 100;
 
 	//尺寸
 	templete = templete.replace('{{width}}', data.options.size.width);
@@ -186,80 +277,80 @@ export const getRenderedSVGFull = (data, avatarBase64, userCoverImageBase64) => 
 
 	//国旗和国家名
 	templete = templete.replace('{{flag}}', getFlagSVG(user.country_code, 135, 56, 20));
-	templete = templete.replace('{{country}}', getTextSVGPath(textToSVGRegular, user.country.name, 161, 59.5, 14));
+	templete = templete.replace('{{country}}', getTextSVGPath(textToSVGRegular, user.country_code, 161, 59.5, 14));
 
 	//模式
 	templete = templete.replace('{{playmode-icon}}', getPlaymodeSVG(data.current_mode, 130, 88, 15));
 	templete = templete.replace('{{playmode}}', getTextSVGPath(textToSVGRegular, libs.getPlaymodeFullName(data.current_mode), 150, 89, 12));
 
 	//等级
-	templete = templete.replace('{{level}}', getTextSVGPath(textToSVGBold, user.statistics.level.current.toString(), 290, 143, 12, 'center middle'));
+	templete = templete.replace('{{level}}', getTextSVGPath(textToSVGBold, level.toString(), 290, 143, 12, 'center middle'));
 	templete = templete.replace(
 		'{{level-percent}}',
-		getTextSVGPath(textToSVGRegular, user.statistics.level.progress + '%', 259.5, 145, 9, 'right top')
+		getTextSVGPath(textToSVGRegular, currentLevelProgress.toFixed(2) + '%', 259.5, 145, 9, 'right top')
 	);
 	templete = templete.replace(
 		'{{level-bar-fg}}',
 		`<path class="cls-10" d="M20,135a2.5,2.5,0,0,0,2.5,2.5H${clamp(
-			Math.round((user.statistics.level.progress / 100) * (256 - 21) + 21),
+			Math.round((currentLevelProgress / 100) * (256 - 21) + 21),
 			21,
 			256
 		)}.833a2.5,2.5,0,0,0,0-5H22.5A2.5,2.5,0,0,0,20,135Z" transform="translate(0 2)" />`
 	);
 
 	//成绩计数
-	const gradesName = ['ssh', 'ss', 'sh', 's', 'a'];
+	const gradesName = ['xh', 'x', 'sh', 's', 'a'];
 	let gradeTextX = 360.7;
 	for (let grade of gradesName) {
 		templete = templete.replace(
 			`{{${grade}-count}}`,
-			getTextSVGPath(textToSVGRegular, user.statistics.grade_counts[grade].toString(), gradeTextX, 153, 9, 'center middle')
+			getTextSVGPath(textToSVGRegular, data.grades["count_" + grade].toString(), gradeTextX, 153, 9, 'center middle')
 		);
 		gradeTextX += 38.62;
 	}
 
 	//pp
-	templete = templete.replace('{{pp}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(user.statistics.pp)), 20, 202, 13));
+	templete = templete.replace('{{pp}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(stats.pp)), 20, 202, 13));
 
 	//奖章
-	templete = templete.replace('{{medals}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(user.user_achievements.length), 82, 202, 13));
+	templete = templete.replace('{{medals}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(countMedals(data.medals)), 82, 202, 13));
 
 	//游戏时间
-	templete = templete.replace('{{playtime}}', getTextSVGPath(textToSVGRegular, libs.formatPlaytime(user.statistics.play_time), 126, 202, 13));
+	templete = templete.replace('{{playtime}}', getTextSVGPath(textToSVGRegular, libs.formatPlaytime(stats.play_time), 126, 202, 13));
 
 	//全球排名/区内排名
-	let globalRanking = libs.formatNumber(user.statistics.global_rank, '#');
+	let globalRanking = libs.formatNumber(stats.rank, '#');
 	templete = templete.replace('{{global-ranking}}', getTextSVGPath(textToSVGRegular, globalRanking, 268, 211, globalRanking.length < 10 ? 27 : 25));
 	templete = templete.replace(
 		'{{country-ranking}}',
-		getTextSVGPath(textToSVGRegular, libs.formatNumber(user.statistics.country_rank, '#'), 269, 277, 17)
+		getTextSVGPath(textToSVGRegular, libs.formatNumber(stats.country_rank, '#'), 269, 277, 17)
 	);
 
 	//其他统计信息
-	const statsName = ['ranked_score', 'play_count', 'total_score', 'total_hits', 'replays_watched_by_others'];
+	const statsName = ['ranked_score', 'play_count', 'total_score', 'total_hits'];
 	let statsTextY = 227;
 	for (let stat of statsName) {
 		templete = templete.replace(
 			`{{${stat.replace(/_/g, '-')}}}`,
-			getTextSVGPath(textToSVGRegular, libs.formatNumber(user.statistics[stat]), 218, statsTextY, 10, 'right top')
+			getTextSVGPath(textToSVGRegular, libs.formatNumber(stats[stat]), 218, statsTextY, 10, 'right top')
 		);
 		statsTextY += 16;
 	}
 
 	//acc
-	templete = templete.replace('{{acc}}', getTextSVGPath(textToSVGRegular, user.statistics.hit_accuracy.toFixed(2).toString() + '%', 424, 202, 13));
+	templete = templete.replace('{{acc}}', getTextSVGPath(textToSVGRegular, stats.accuracy.toFixed(2).toString() + '%', 424, 202, 13));
 	//最大连击
 	templete = templete.replace(
 		'{{max-combo}}',
-		getTextSVGPath(textToSVGRegular, libs.formatNumber(user.statistics.maximum_combo) + 'x', 483, 202, 13)
+		getTextSVGPath(textToSVGRegular, libs.formatNumber(stats.max_combo) + 'x', 483, 202, 13)
 	);
 	//bp
 	templete = templete.replace(
 		'{{bp}}',
-		getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(data.top_ranks.best?.items[0]?.pp ?? 0)) + 'pp', 424, 249, 13)
+		getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(getHighestPP(data.scores) ?? 0)) + 'pp', 424, 249, 13)
 	);
 	//第一名
-	templete = templete.replace('{{first-place}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(data.top_ranks.firsts.count), 483, 249, 13));
+	templete = templete.replace('{{first-place}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(getTotalFirstPlaces(data.top_ranks)), 483, 249, 13));
 
 	//osu! skills
 	if (data.options.includeSkills) {
@@ -362,6 +453,7 @@ export const getRenderedSVGFull = (data, avatarBase64, userCoverImageBase64) => 
 export const getRenderedSVGMini = (data, avatarBase64, userCoverImageBase64) => {
 	let templete = getSVGTemplete('mini', data.options.language);
 	let user = data.user;
+	let stats = data.stats;
 
 	//尺寸
 	templete = templete.replace('{{width}}', data.options.size.width);
@@ -393,7 +485,7 @@ export const getRenderedSVGMini = (data, avatarBase64, userCoverImageBase64) => 
 	//区内排名
 	templete = templete.replace(
 		'{{country-ranking}}',
-		getTextSVGPath(textToSVGRegular, libs.formatNumber(user.statistics.country_rank, '#'), 360, 12, 10, 'right top')
+		getTextSVGPath(textToSVGRegular, libs.formatNumber(stats.country_rank, '#'), 360, 12, 10, 'right top')
 	);
 
 	//模式
@@ -402,19 +494,19 @@ export const getRenderedSVGMini = (data, avatarBase64, userCoverImageBase64) => 
 	//等级
 	templete = templete.replace(
 		'{{level}}',
-		getTextSVGPath(textToSVGRegular, 'lv.' + user.statistics.level.current.toString(), 369, 31, 10, 'right top')
+		getTextSVGPath(textToSVGRegular, 'lv.' + getLevel(stats.ranked_score), 369, 31, 10, 'right top')
 	);
 
 	//全球排名
-	let globalRanking = libs.formatNumber(user.statistics.global_rank, '#');
+	let globalRanking = libs.formatNumber(stats.rank, '#');
 	templete = templete.replace('{{global-ranking}}', getTextSVGPath(textToSVGRegular, globalRanking, 120, 86, globalRanking.length < 10 ? 18 : 17));
 
 	//pp
-	templete = templete.replace('{{pp}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(user.statistics.pp)), 226, 81.5, 13));
+	templete = templete.replace('{{pp}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(Math.round(stats.pp)), 226, 81.5, 13));
 	//acc
-	templete = templete.replace('{{acc}}', getTextSVGPath(textToSVGRegular, user.statistics.hit_accuracy.toFixed(2).toString() + '%', 281, 81.5, 13));
+	templete = templete.replace('{{acc}}', getTextSVGPath(textToSVGRegular, stats.accuracy.toFixed(2).toString() + '%', 281, 81.5, 13));
 	//游戏次数
-	templete = templete.replace('{{play-count}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(user.statistics.play_count), 336, 81.5, 13));
+	templete = templete.replace('{{play-count}}', getTextSVGPath(textToSVGRegular, libs.formatNumber(stats.play_count), 336, 81.5, 13));
 
 	return minifySVG(templete);
 };
@@ -465,8 +557,8 @@ export const getRenderedSVGSkillOnly = (data, avatarBase64, userCoverImageBase64
 	templete = templete.replace('{{user-cover-base64}}', userCoverImageBase64);
 
 	//全球排名/区内排名
-	let globalRanking = libs.formatNumber(user.statistics.global_rank, '#');
-	let countryRanking = libs.formatNumber(user.statistics.country_rank, '#');
+	let globalRanking = libs.formatNumber(stats.rank, '#');
+	let countryRanking = libs.formatNumber(stats.country_rank, '#');
 	templete = templete.replace('{{global-ranking}}', getTextSVGPath(textToSVGRegular, globalRanking, 384, 34, globalRanking.length < 10 ? 18 : 17, 'right top'));
 	templete = templete.replace('{{country-ranking}}', getTextSVGPath(textToSVGRegular, countryRanking, 384, 34, countryRanking.length < 10 ? 18 : 17, 'right top'));
 	

@@ -3,57 +3,84 @@ import got from 'got';
 import path from 'path';
 import cheerio from 'cheerio';
 
+const fetchAndParse = async (url) => {
+	let response;
+	try {
+		response = await fetch(url);	
+	} catch (error) {
+		return null;
+	}
+
+	const body = await response.text();
+	let data;
+	try {
+		data = JSON.parse(body);
+	} catch (error) {
+		return null;
+	}
+	return data;
+};
+
 export const getUser = async (username, server = 'osu.ppy.sh', playmode = 'std', includeTopPlays = false, includeSkills = false) => {
 	if (username == '@example') {
 		const filePath = path.join(process.cwd(), `/assets/example/user.json`);	
 		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 	}
 	const playmodes = {
-		std: 'osu',
-		taiko: 'taiko',
-		catch: 'fruits',
-		mania: 'mania',
+		std: 'Standard',
+		taiko: 'Taiko',
+		catch: 'CatchTheBeat',
+		mania: 'Mania',
 	}
 	if (!playmodes[playmode]){
 		return {
 			error: `Invalid playmode ${playmode}`
 		}
 	}
-	let response;
-	try {
-		response = await got({
-			method: 'get',
-			url: `https://${server}/users/${username}/${playmodes[playmode]}`,
-		});	
-	} catch (error) {
-		if (error.response.statusCode === 404){
-			return {
-				error: `User ${username} not found`
-			}
-		}
+
+	const response = await fetchAndParse(`https://${server}/user/${username}/${playmodes[playmode]}`);
+	if (!response) {
 		return {
-			error: `Unknown Error`
+			error: `Failed to get user data`
 		}
 	}
-	
-    const body = response.body;
-	let $ = cheerio.load(body);
-	let data = JSON.parse($('.js-react--profile-page').attr('data-initial-data'));
-	data.current_mode = playmode;
 
-	if (includeTopPlays) {
-		response = await got({
-			method: 'get',
-			url: `https://${server}/users/${data.user.id}/extra-pages/top_ranks?mode=${playmodes[playmode]}`,
-		});
-		data.top_ranks = JSON.parse(response.body);
+	const gradesResponse = await fetchAndParse(`https://${server}/user/${username}/grades?mode=${playmodes[playmode]}`);
+	if (!gradesResponse) {
+		return {
+			error: `Failed to get user grades data`
+		}
 	}
 
-	if (includeSkills) {
-		data.user.skills = await getUserOsuSkills(data.user.username);
+	const scoresResponse = await fetchAndParse(`https://${server}/user/${username}/scores?mode=${playmodes[playmode]}&type=Best&limit=100`);
+	if (!scoresResponse) {
+		return {
+			error: `Failed to get user scores data`
+		}
 	}
 
-	return data;
+	const medalsResponse = await fetchAndParse(`https://${server}/user/${username}/medals?mode=${playmodes[playmode]}`);
+	if (!medalsResponse) {
+		return {
+			error: `Failed to get user medals data`
+		}
+	}
+
+	const firstPlacesResponse = await fetchAndParse(`https://${server}/user/${username}/scores?mode=${playmodes[playmode]}&type=Top`);
+	if (!firstPlacesResponse) {
+		return {
+			error: `Failed to get user first places data`
+		}
+	}
+
+	response.grades = gradesResponse;
+	response.scores = scoresResponse;
+	response.medals = medalsResponse;
+	response.top_ranks = firstPlacesResponse;
+
+	response.current_mode = playmode;
+
+	return response;
 }
 export const getImage = async (url) => {
 	if (url.startsWith('example_')){

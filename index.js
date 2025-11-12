@@ -39,7 +39,7 @@ app.get('/card', async function (req, res) {
 		userData = await api.getUser(username, server, playmode, !isMini, includeSkills);
 		if (userData.error) return res.send(render.getErrorSVG('Error: ' + userData.error));
 		avatarBase64 = await api.getImageBase64(userData.user.avatar_url);
-		userCoverImage = await api.getImage(userData.user.cover_url);
+		userCoverImage = await api.getImage(userData.user.banner_url);
 		cacheControl.set(cacheKey, { userData, avatarBase64, userCoverImage });
 	}
 
@@ -111,7 +111,7 @@ app.get('/skills', async function (req, res) {
 		userData = await api.getUser(username, playmode, false, true);
 		if (userData.error) return res.send(render.getErrorSVG('Error: ' + userData.error));
 		avatarBase64 = await api.getImageBase64(userData.user.avatar_url);
-		userCoverImage = await api.getImage(userData.user.cover_url);
+		userCoverImage = await api.getImage(userData.user.banner_url);
 		cacheControl.set(cacheKey, { userData, avatarBase64, userCoverImage });
 	}
 
@@ -149,4 +149,4 @@ app.get('/skills', async function (req, res) {
 	res.send(svg);
 });
 
-app.listen(process.env.PORT || 3000);
+app.listen(process.env.PORT || 3001);
