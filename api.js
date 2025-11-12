@@ -3,7 +3,7 @@ import got from 'got';
 import path from 'path';
 import cheerio from 'cheerio';
 
-export const getUser = async (username, playmode = 'std', includeTopPlays = false, includeSkills = false) => {
+export const getUser = async (username, server = 'osu.ppy.sh', playmode = 'std', includeTopPlays = false, includeSkills = false) => {
 	if (username == '@example') {
 		const filePath = path.join(process.cwd(), `/assets/example/user.json`);	
 		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
@@ -23,7 +23,7 @@ export const getUser = async (username, playmode = 'std', includeTopPlays = fals
 	try {
 		response = await got({
 			method: 'get',
-			url: `https://osu.ppy.sh/users/${username}/${playmodes[playmode]}`,
+			url: `https://${server}/users/${username}/${playmodes[playmode]}`,
 		});	
 	} catch (error) {
 		if (error.response.statusCode === 404){
@@ -44,7 +44,7 @@ export const getUser = async (username, playmode = 'std', includeTopPlays = fals
 	if (includeTopPlays) {
 		response = await got({
 			method: 'get',
-			url: `https://osu.ppy.sh/users/${data.user.id}/extra-pages/top_ranks?mode=${playmodes[playmode]}`,
+			url: `https://${server}/users/${data.user.id}/extra-pages/top_ranks?mode=${playmodes[playmode]}`,
 		});
 		data.top_ranks = JSON.parse(response.body);
 	}

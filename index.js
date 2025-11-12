@@ -16,10 +16,14 @@ app.get('/card', async function (req, res) {
 		'Cache-Control': 'public, max-age=3600'
 	});
 	let username = req.query.user ?? '';
+	const server = req.query.server ?? 'osu.ppy.sh';
 	const playmode = req.query.mode ?? 'std';
 	const isMini = req.query.mini != undefined && req.query.mini == 'true';
-	const includeSkills = req.query.skills != undefined && req.query.skills == 'true';
 	const cycleSkillsStats = req.query.cycleskillsstats != undefined && req.query.cycleskillsstats == 'true' && includeSkills;
+	let includeSkills = req.query.skills != undefined && req.query.skills == 'true';
+
+	if (server !== 'osu.ppy.sh')
+		includeSkills = false;
 
 	const exampleMode = req.query.example != undefined && req.query.example == 'true';
 	if (exampleMode) {
@@ -32,7 +36,7 @@ app.get('/card', async function (req, res) {
 	if (req.headers['cache-control'] != 'no-cache' && cacheControl.has(cacheKey)) {
 		({ userData, avatarBase64, userCoverImage } = cacheControl.get(cacheKey));
 	} else {
-		userData = await api.getUser(username, playmode, !isMini, includeSkills);
+		userData = await api.getUser(username, server, playmode, !isMini, includeSkills);
 		if (userData.error) return res.send(render.getErrorSVG('Error: ' + userData.error));
 		avatarBase64 = await api.getImageBase64(userData.user.avatar_url);
 		userCoverImage = await api.getImage(userData.user.cover_url);

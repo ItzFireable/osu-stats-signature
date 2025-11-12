@@ -2,6 +2,7 @@ const i18n = {
 	en: {
 		'生成 osu! 签名档卡片': 'Generate osu! signature card',
 		'用户名 / UID': 'Username / UID',
+		'服务器 (osu.ppy.sh)': 'Server (osu.ppy.sh)',
 		'背景模糊': 'Background blur',
 		'模糊强度': 'Blur size',
 		'圆头像': 'Round avatar',
@@ -43,6 +44,7 @@ const app = {
 	data() {
 		return {
 			username: "",
+			server: "osu.ppy.sh",
 			playmode: "std",
 			language: navigator.language.includes("zh") ? "cn" : "en",
 			cardmode: "full_stats",
@@ -91,7 +93,7 @@ const app = {
 			return Math.min(Math.max(val, min), max);
 		},
 		generate() {
-			let url = `/card?user=${encodeURI(this.username.trim())}&mode=${this.playmode}`;
+			let url = `/card?user=${encodeURI(this.username.trim())}&mode=${this.playmode}&server=${encodeURI(this.server.trim())}`;
 			if (this.language != "cn") {
 				url += `&lang=${this.language}`;
 			}
@@ -157,7 +159,7 @@ const app = {
 				}
 			}
 			this.generated_url = url;
-			this.generated_osu_profile_url = `https://osu.ppy.sh/u/${this.username}`;
+			this.generated_osu_profile_url = `https://${this.server}/u/${this.username}`;
 			this.$nextTick(() => {
 				const results = document.getElementById("results");
 				results.scrollIntoView({ behavior: "smooth" });
